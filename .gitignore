@@ -6,3 +6,6 @@ __pycache__/
 # ansible-lint installs the collection's dependencies here when it runs.
 # Never commit it, and never let yamllint walk into it -- see .yamllint.
 .ansible/
+
+# Real inventory; only the .example is tracked.
+inventory/demo.ini
