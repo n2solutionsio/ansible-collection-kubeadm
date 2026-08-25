@@ -21,7 +21,8 @@ Ansible is good at. Bootstrap is neither.
 | Container runtime | containerd, `SystemdCgroup = true`, pinned `sandbox_image` |
 | eBPF groundwork | `bpffs` mounted at `/sys/fs/bpf`, cgroup v2 asserted |
 | Images | Pause image pre-pulled; arbitrary extras via `node_prep_prepull_images` |
-| Kubernetes packages | Downloaded to `/opt/kubeadm-staging`, **not installed** |
+| OS prerequisites | `conntrack`, `socat`, `nfs-common` installed — not pulled in by any dependency |
+| Kubernetes packages | `kubelet`, `kubeadm`, `kubectl`, `cri-tools` downloaded to `/opt/kubeadm-staging`, **not installed** |
 | Notes | `INSTALL-NOTES.md` written to each node with the exact install command |
 
 ## What it deliberately does not do

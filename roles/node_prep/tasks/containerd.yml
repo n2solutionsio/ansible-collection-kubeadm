@@ -41,20 +41,34 @@
     group: root
     mode: "0755"
 
-- name: Check whether containerd config already exists
-  ansible.builtin.stat:
-    path: /etc/containerd/config.toml
-  register: node_prep_containerd_config
+- name: Read the current containerd config
+  ansible.builtin.slurp:
+    src: /etc/containerd/config.toml
+  register: node_prep_containerd_current
+  failed_when: false
+
+# The containerd.io package ships a stub config -- a licence header and
+# `disabled_plugins = ["cri"]` -- not a full default. Testing only for the
+# file's existence therefore skips generation and leaves CRI switched off, so
+# kubelet cannot reach the runtime at all and kubeadm fails with "container
+# runtime is not running". Detect the stub by the absence of SystemdCgroup,
+# which only a real generated config contains.
+- name: Detect a stub or missing containerd config
+  ansible.builtin.set_fact:
+    node_prep_containerd_needs_default: >-
+      {{ node_prep_containerd_current.content is not defined
+         or 'SystemdCgroup' not in (node_prep_containerd_current.content | b64decode) }}
 
 # Generated rather than templated: the config schema has changed across
 # containerd majors (v2 moved to config version 3), and a hand-written template
 # silently drifts. Generate the default this binary understands, then edit the
 # two values kubeadm cares about.
 - name: Generate default containerd config
-  when: not node_prep_containerd_config.stat.exists
+  when: node_prep_containerd_needs_default | bool
   ansible.builtin.shell:
     cmd: containerd config default > /etc/containerd/config.toml
   changed_when: true
+  notify: Restart containerd
 
 # The single most common kubeadm failure: kubelet uses the systemd cgroup
 # driver, containerd defaults to cgroupfs, and the mismatch surfaces much later
@@ -80,11 +94,26 @@
     enabled: true
     daemon_reload: true
 
-- name: Verify the systemd cgroup driver is actually set
-  ansible.builtin.command: grep -c 'SystemdCgroup = true' /etc/containerd/config.toml
-  register: node_prep_cgroup_check
-  changed_when: false
-  failed_when: node_prep_cgroup_check.stdout | int < 1
+# Both checks read the file rather than trusting the replace tasks above: a
+# `replace` whose regexp matches nothing reports ok, not failed, so a silently
+# ineffective edit looks identical to a successful one.
+- name: Read the containerd config back
+  ansible.builtin.slurp:
+    src: /etc/containerd/config.toml
+  register: node_prep_containerd_final
+
+- name: Verify containerd is usable by kubelet
+  ansible.builtin.assert:
+    that:
+      - "'SystemdCgroup = true' in node_prep_containerd_final.content | b64decode"
+      - "'\"cri\"' not in (node_prep_containerd_final.content | b64decode
+         | regex_search('disabled_plugins\\s*=\\s*\\[[^\\]]*\\]') | default('', true))"
+    fail_msg: >-
+      /etc/containerd/config.toml is not usable by kubelet. It needs
+      'SystemdCgroup = true' and must not list "cri" in disabled_plugins. The
+      containerd.io package ships a stub with CRI disabled; if this fires, the
+      default config was not generated over it.
+    quiet: true
 
 # Flush the restart handler before pulling: ctr talks to the running daemon, and
 # a config change still sitting in a pending handler means we would be talking

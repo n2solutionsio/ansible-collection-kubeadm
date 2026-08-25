@@ -30,10 +30,16 @@ node_prep_staging_dir: /opt/kubeadm-staging
 node_prep_notes_path: /opt/kubeadm-staging/INSTALL-NOTES.md
 
 # Packages staged for manual installation.
+#
+# cri-tools is listed explicitly because nothing pulls it in: kubeadm's Depends
+# field is empty, and kubelet depends only on iptables, kubernetes-cni, mount,
+# util-linux and libc6. Relying on apt to resolve the Kubernetes toolchain gets
+# you kubernetes-cni and nothing else.
 node_prep_staged_packages:
   - kubelet
   - kubeadm
   - kubectl
+  - cri-tools
 
 # --- eBPF / CNI groundwork --------------------------------------------------
 # Deliberately CNI-agnostic. These make an eBPF CNI (Cilium, Calico's eBPF
@@ -70,11 +76,22 @@ node_prep_configure_kernel: true
 node_prep_install_containerd: true
 node_prep_stage_packages: true
 
-# Extra packages every node gets. nfs-common is here because its absence has
-# bitten this homelab before -- pods with NFS PVCs fail to mount with a message
-# that does not mention the missing client.
+# Extra packages every node gets.
+#
+# conntrack and socat are OS-level prerequisites, not Kubernetes binaries, so
+# they are installed rather than staged -- installing them does not cross the
+# "no Kubernetes installed" line this role holds. Neither is pulled in
+# automatically: kubeadm declares no dependencies at all, and kubelet does not
+# list them. kubeadm init's preflight checks fail without conntrack, and
+# kubectl port-forward needs socat.
+#
+# nfs-common is here because its absence has bitten this homelab before -- pods
+# with NFS PVCs fail to mount with a message that does not mention the missing
+# client.
 node_prep_extra_packages:
   - nfs-common
+  - conntrack
+  - socat
   - apt-transport-https
   - ca-certificates
   - curl
