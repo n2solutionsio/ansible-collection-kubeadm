@@ -35,6 +35,35 @@ node_prep_staged_packages:
   - kubeadm
   - kubectl
 
+# --- eBPF / CNI groundwork --------------------------------------------------
+# Deliberately CNI-agnostic. These make an eBPF CNI (Cilium, Calico's eBPF
+# dataplane) possible without choosing one, and are inert for CNIs that do not
+# use eBPF -- so leaving them on costs nothing.
+
+# Mount bpffs at /sys/fs/bpf and persist it. Cilium requires it.
+node_prep_mount_bpffs: true
+
+# Fail early if the host is not on the unified cgroup hierarchy. Ubuntu 24.04
+# already is; this exists so a host that is not fails here rather than as an
+# opaque eBPF error much later.
+node_prep_require_cgroup_v2: true
+
+# Images to pull into containerd's k8s.io namespace before bootstrap. Empty
+# commits to nothing. Populate to pre-stage a CNI, e.g.:
+#
+#   node_prep_prepull_images:
+#     - quay.io/cilium/cilium:v1.19.1
+#     - quay.io/cilium/operator-generic:v1.19.1
+#
+# Note this does NOT cover the control-plane images kubeadm pulls
+# (kube-apiserver, etcd, coredns, ...). Their canonical list comes from
+# `kubeadm config images list`, which needs kubeadm installed -- so that stays
+# out of scope for a role that deliberately does not install it.
+node_prep_prepull_images: []
+
+# Pull the pause image now rather than during kubeadm init.
+node_prep_prepull_sandbox_image: true
+
 # --- toggles ----------------------------------------------------------------
 node_prep_disable_swap: true
 node_prep_configure_kernel: true

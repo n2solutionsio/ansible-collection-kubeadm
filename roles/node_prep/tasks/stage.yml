@@ -51,16 +51,23 @@
     patterns: "*.deb"
   register: node_prep_staged_files
 
+# Checked per package rather than by counting files. A count passes even when
+# the wrong things were downloaded -- dependencies alone can satisfy it while
+# one of the requested packages is silently absent.
 - name: Assert every requested package was staged
   ansible.builtin.assert:
     that:
-      - node_prep_staged_files.files | length >= node_prep_staged_packages | length
+      - node_prep_staged_files.files
+        | map(attribute='path') | map('basename')
+        | select('match', '^' ~ item ~ '_') | list | length > 0
     fail_msg: >-
-      Expected at least {{ node_prep_staged_packages | length }} .deb files in
-      {{ node_prep_staging_dir }}, found {{ node_prep_staged_files.files | length }}.
-      The download step reported success, so check the repo for
-      v{{ node_prep_k8s_version }}.
+      No .deb matching '{{ item }}_*' found in {{ node_prep_staging_dir }}.
+      Staged: {{ node_prep_staged_files.files | map(attribute='path')
+      | map('basename') | sort | join(', ') | default('nothing', true) }}.
+      The download reported success, so check that '{{ item }}' exists in the
+      v{{ node_prep_k8s_version }} repository.
     quiet: true
+  loop: "{{ node_prep_staged_packages }}"
 
 - name: Write install notes
   ansible.builtin.template:
@@ -73,5 +80,5 @@
 - name: Report what was staged
   ansible.builtin.debug:
     msg: >-
-      Staged {{ node_prep_staged_files.files | length }} .deb files in
-      {{ node_prep_staging_dir }}. Nothing installed. See {{ node_prep_notes_path }}.
+      Staged in {{ node_prep_staging_dir }} (nothing installed):
+      {{ node_prep_staged_files.files | map(attribute='path') | map('basename') | sort | join(', ') }}

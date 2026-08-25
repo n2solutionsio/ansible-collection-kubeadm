@@ -1,0 +1,32 @@
+---
+# Groundwork for eBPF-based CNIs (Cilium, Calico's eBPF dataplane) without
+# committing to one. Inert for CNIs that do not use eBPF, so it is safe to leave
+# on regardless of what you eventually deploy.
+
+- name: Assert cgroup v2 is in use
+  when: node_prep_require_cgroup_v2 | bool
+  block:
+    - name: Check for the unified cgroup hierarchy
+      ansible.builtin.stat:
+        path: /sys/fs/cgroup/cgroup.controllers
+      register: node_prep_cgroup_v2
+
+    - name: Fail if cgroup v2 is unavailable
+      ansible.builtin.assert:
+        that:
+          - node_prep_cgroup_v2.stat.exists
+        fail_msg: >-
+          /sys/fs/cgroup/cgroup.controllers is missing, so this host is not on
+          the unified cgroup hierarchy. eBPF CNIs require cgroup v2, and
+          containerd is configured here for the systemd cgroup driver. Boot with
+          systemd.unified_cgroup_hierarchy=1 before continuing.
+        quiet: true
+
+- name: Mount bpffs
+  when: node_prep_mount_bpffs | bool
+  ansible.posix.mount:
+    path: /sys/fs/bpf
+    src: bpffs
+    fstype: bpffs
+    opts: rw,nosuid,nodev,noexec,relatime,mode=700
+    state: mounted

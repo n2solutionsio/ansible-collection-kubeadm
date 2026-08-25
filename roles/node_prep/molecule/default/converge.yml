@@ -18,6 +18,12 @@
     node_prep_configure_kernel: false
     node_prep_install_containerd: false
     node_prep_stage_packages: true
+    # bpffs cannot be mounted from an unprivileged container namespace, and
+    # there is no containerd here to pull into. Both ride on the toggles above.
+    node_prep_mount_bpffs: false
+    node_prep_require_cgroup_v2: false
+    node_prep_prepull_sandbox_image: false
+    node_prep_prepull_images: []
 
   roles:
     - role: n2solutions.kubeadm.node_prep

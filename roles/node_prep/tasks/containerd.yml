@@ -85,3 +85,16 @@
   register: node_prep_cgroup_check
   changed_when: false
   failed_when: node_prep_cgroup_check.stdout | int < 1
+
+# Flush the restart handler before pulling: ctr talks to the running daemon, and
+# a config change still sitting in a pending handler means we would be talking
+# to containerd with stale settings.
+- name: Apply pending containerd restarts before pulling
+  when: node_prep_prepull_sandbox_image | bool
+  ansible.builtin.meta: flush_handlers
+
+- name: Pre-pull the sandbox image
+  when: node_prep_prepull_sandbox_image | bool
+  vars:
+    node_prep_prepull_images: ["{{ node_prep_sandbox_image }}"]
+  ansible.builtin.include_tasks: images.yml

@@ -24,9 +24,19 @@
   when: node_prep_configure_kernel | bool
   ansible.builtin.include_tasks: kernel.yml
 
+- name: Prepare eBPF prerequisites
+  when: node_prep_configure_kernel | bool
+  ansible.builtin.include_tasks: ebpf.yml
+
 - name: Install and configure containerd
   when: node_prep_install_containerd | bool
   ansible.builtin.include_tasks: containerd.yml
+
+- name: Pre-pull requested images
+  when:
+    - node_prep_install_containerd | bool
+    - node_prep_prepull_images | length > 0
+  ansible.builtin.include_tasks: images.yml
 
 - name: Stage Kubernetes packages without installing them
   when: node_prep_stage_packages | bool

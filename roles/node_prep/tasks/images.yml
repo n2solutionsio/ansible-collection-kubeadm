@@ -1,0 +1,34 @@
+---
+# Pre-pulls images into containerd's k8s.io namespace -- the namespace kubelet
+# and crictl read, so an image pulled into the default namespace would be
+# invisible to Kubernetes.
+#
+# Deliberately CNI-agnostic: the caller supplies the list. Empty by default, so
+# this whole file is a no-op until you decide what you are running.
+
+- name: List images already present
+  ansible.builtin.command: ctr --namespace k8s.io images ls -q
+  register: node_prep_existing_images
+  changed_when: false
+
+- name: Pre-pull images
+  ansible.builtin.command:
+    argv:
+      - ctr
+      - --namespace
+      - k8s.io
+      - images
+      - pull
+      - "{{ item }}"
+  loop: "{{ node_prep_prepull_images }}"
+  when: item not in node_prep_existing_images.stdout_lines
+  register: node_prep_image_pull
+  changed_when: node_prep_image_pull is not skipped
+
+- name: Report pre-pulled images
+  when: node_prep_prepull_images | length > 0
+  ansible.builtin.debug:
+    msg: >-
+      containerd k8s.io namespace holds
+      {{ node_prep_prepull_images | length }} requested image(s):
+      {{ node_prep_prepull_images | join(', ') }}
