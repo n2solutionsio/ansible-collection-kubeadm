@@ -10,3 +10,5 @@ rules:
     min-spaces-from-content: 1
 ignore:
   - .github/
+  # Dependencies installed by ansible-lint; not ours to lint.
+  - .ansible/

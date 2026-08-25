@@ -2,3 +2,7 @@
 __pycache__/
 .venv/
 *.retry
+
+# ansible-lint installs the collection's dependencies here when it runs.
+# Never commit it, and never let yamllint walk into it -- see .yamllint.
+.ansible/
