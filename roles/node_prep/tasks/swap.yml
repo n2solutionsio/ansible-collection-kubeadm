@@ -1,0 +1,45 @@
+---
+# kubelet refuses to start with swap on unless explicitly told otherwise, so
+# this has to survive reboots -- turning it off at runtime is not enough.
+
+- name: Check for active swap
+  ansible.builtin.command: swapon --noheadings --show=NAME
+  register: node_prep_active_swap
+  changed_when: false
+  failed_when: false
+
+- name: Disable swap at runtime
+  when: node_prep_active_swap.stdout | length > 0
+  ansible.builtin.command: swapoff -a
+  changed_when: true
+
+- name: Comment out swap entries in fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#\n].*\sswap\s.*)$'
+    replace: '# \1  # disabled by n2solutions.kubeadm.node_prep'
+    backup: true
+
+# Ubuntu cloud images ship swap as a systemd unit, not only an fstab line;
+# masking fstab alone lets it come back on reboot.
+#
+# Uses the service_facts module rather than parsing `systemctl` output, which
+# is neither stable across versions nor safe to pipe without pipefail.
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Select swap units
+  ansible.builtin.set_fact:
+    node_prep_swap_units: >-
+      {{ ansible_facts.services | dict2items
+         | selectattr('key', 'search', '\.swap$')
+         | map(attribute='key') | list }}
+
+- name: Mask swap units
+  when: node_prep_swap_units | length > 0
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    masked: true
+    state: stopped
+  loop: "{{ node_prep_swap_units }}"

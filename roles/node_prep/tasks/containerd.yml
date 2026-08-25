@@ -1,0 +1,87 @@
+---
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Fetch Docker apt signing key
+  ansible.builtin.get_url:
+    url: "{{ node_prep_docker_repo_url }}/gpg"
+    dest: /etc/apt/keyrings/docker.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure Docker apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+      {{ node_prep_docker_repo_url }}
+      {{ ansible_facts['distribution_release'] }} stable
+    filename: docker
+    state: present
+    update_cache: true
+
+- name: Install containerd
+  ansible.builtin.apt:
+    name: >-
+      {{ node_prep_containerd_package }}{{
+        '=' ~ node_prep_containerd_version if node_prep_containerd_version | length > 0 else ''
+      }}
+    state: present
+
+- name: Ensure containerd config directory exists
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check whether containerd config already exists
+  ansible.builtin.stat:
+    path: /etc/containerd/config.toml
+  register: node_prep_containerd_config
+
+# Generated rather than templated: the config schema has changed across
+# containerd majors (v2 moved to config version 3), and a hand-written template
+# silently drifts. Generate the default this binary understands, then edit the
+# two values kubeadm cares about.
+- name: Generate default containerd config
+  when: not node_prep_containerd_config.stat.exists
+  ansible.builtin.shell:
+    cmd: containerd config default > /etc/containerd/config.toml
+  changed_when: true
+
+# The single most common kubeadm failure: kubelet uses the systemd cgroup
+# driver, containerd defaults to cgroupfs, and the mismatch surfaces much later
+# as pods stuck in ContainerCreating rather than as an obvious error here.
+- name: Use the systemd cgroup driver
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)SystemdCgroup\s*=\s*false\s*$'
+    replace: '\1SystemdCgroup = true'
+  notify: Restart containerd
+
+- name: Pin the sandbox image
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\s*)sandbox_image\s*=\s*".*"$'
+    replace: '\1sandbox_image = "{{ node_prep_sandbox_image }}"'
+  notify: Restart containerd
+
+- name: Enable and start containerd
+  ansible.builtin.systemd_service:
+    name: containerd
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Verify the systemd cgroup driver is actually set
+  ansible.builtin.command: grep -c 'SystemdCgroup = true' /etc/containerd/config.toml
+  register: node_prep_cgroup_check
+  changed_when: false
+  failed_when: node_prep_cgroup_check.stdout | int < 1

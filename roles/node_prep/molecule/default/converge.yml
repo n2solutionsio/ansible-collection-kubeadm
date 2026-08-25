@@ -1,0 +1,23 @@
+---
+# Scope note: a container is not a faithful stand-in for a kubeadm node.
+# modprobe cannot load host kernel modules, there is no swap to disable, and
+# containerd will not run meaningfully under another container runtime. Those
+# three sections are disabled here rather than asserted against a fake pass --
+# they are exercised on real VMs, not in CI.
+#
+# What this scenario genuinely covers: base package installation, the
+# pkgs.k8s.io repository wiring, the download-without-install behaviour, and
+# idempotence across the whole role.
+
+- name: Converge
+  hosts: all
+  become: true
+
+  vars:
+    node_prep_disable_swap: false
+    node_prep_configure_kernel: false
+    node_prep_install_containerd: false
+    node_prep_stage_packages: true
+
+  roles:
+    - role: n2solutions.kubeadm.node_prep

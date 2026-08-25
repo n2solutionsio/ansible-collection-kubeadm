@@ -1,0 +1,77 @@
+---
+# Downloads kubelet/kubeadm/kubectl but deliberately does NOT install them.
+# The .debs are copied out of the apt cache into a staging directory so that
+# `apt-get clean` or a cache expiry cannot quietly remove them between this run
+# and whenever the manual install happens.
+
+- name: Fetch Kubernetes apt signing key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ node_prep_k8s_version }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc]
+      https://pkgs.k8s.io/core:/stable:/v{{ node_prep_k8s_version }}/deb/ /
+    filename: kubernetes
+    state: present
+    update_cache: true
+
+- name: Ensure staging directory exists
+  ansible.builtin.file:
+    path: "{{ node_prep_staging_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Resolve package specs
+  ansible.builtin.set_fact:
+    node_prep_pkg_specs: >-
+      {{ node_prep_staged_packages | map('regex_replace', '$',
+         ('=' ~ node_prep_k8s_package_version)
+         if node_prep_k8s_package_version | length > 0 else '') | list }}
+
+- name: Download packages without installing
+  ansible.builtin.command:
+    argv: >-
+      {{ ['apt-get', 'install', '--download-only', '--yes',
+          '-o', 'Dir::Cache::archives=' ~ node_prep_staging_dir]
+         + node_prep_pkg_specs }}
+  register: node_prep_download
+  changed_when: "'Get:' in node_prep_download.stdout"
+
+- name: Collect staged package files
+  ansible.builtin.find:
+    paths: "{{ node_prep_staging_dir }}"
+    patterns: "*.deb"
+  register: node_prep_staged_files
+
+- name: Assert every requested package was staged
+  ansible.builtin.assert:
+    that:
+      - node_prep_staged_files.files | length >= node_prep_staged_packages | length
+    fail_msg: >-
+      Expected at least {{ node_prep_staged_packages | length }} .deb files in
+      {{ node_prep_staging_dir }}, found {{ node_prep_staged_files.files | length }}.
+      The download step reported success, so check the repo for
+      v{{ node_prep_k8s_version }}.
+    quiet: true
+
+- name: Write install notes
+  ansible.builtin.template:
+    src: INSTALL-NOTES.md.j2
+    dest: "{{ node_prep_notes_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Report what was staged
+  ansible.builtin.debug:
+    msg: >-
+      Staged {{ node_prep_staged_files.files | length }} .deb files in
+      {{ node_prep_staging_dir }}. Nothing installed. See {{ node_prep_notes_path }}.

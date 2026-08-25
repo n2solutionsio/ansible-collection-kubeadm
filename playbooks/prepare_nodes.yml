@@ -1,0 +1,16 @@
+---
+# Manual entry point.
+#
+#   ansible-playbook -i inventory/demo.ini \
+#     n2solutions.kubeadm.prepare_nodes
+#
+# Prepares hosts to become kubeadm nodes. Does not install kubelet/kubeadm/
+# kubectl, and does not init or join a cluster -- see roles/node_prep/README.md.
+
+- name: Prepare kubeadm nodes
+  hosts: "{{ target_hosts | default('kubeadm_nodes') }}"
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: n2solutions.kubeadm.node_prep

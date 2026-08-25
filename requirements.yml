@@ -1,0 +1,7 @@
+---
+# Dependencies of this collection. Consumers installing it via ansible-galaxy
+# get these automatically from galaxy.yml; this file is for developing and
+# testing the collection itself.
+collections:
+  - name: ansible.posix
+  - name: community.general

@@ -1,0 +1,21 @@
+# Example inventory. Copy to inventory/demo.ini and adjust.
+#
+# node_prep does not care about control-plane vs worker -- every node gets
+# identical preparation. The split exists so the later bootstrap step, and
+# any --limit you run by hand, have groups to target.
+
+[kubeadm_control_plane]
+homelab-demo-cp-0 ansible_host=10.30.30.20
+
+[kubeadm_workers]
+homelab-demo-worker-1 ansible_host=10.30.30.21
+homelab-demo-worker-2 ansible_host=10.30.30.22
+
+[kubeadm_nodes:children]
+kubeadm_control_plane
+kubeadm_workers
+
+[kubeadm_nodes:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/homelab_automation
+ansible_python_interpreter=/usr/bin/python3

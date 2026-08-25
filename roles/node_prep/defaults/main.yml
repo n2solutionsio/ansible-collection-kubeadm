@@ -1,0 +1,52 @@
+---
+# Kubernetes minor version. Drives both the pkgs.k8s.io apt repository and the
+# version the staged packages are pulled from. pkgs.k8s.io publishes a separate
+# repo per minor, so this is not cosmetic -- changing it changes the source.
+#
+# Defaults to 1.33 to match the homelab k3s cluster, so a single kubectl works
+# against both (skew policy tolerates +/-1 minor).
+node_prep_k8s_version: "1.33"
+
+# Pin an exact package version, e.g. "1.33.4-1.1". Empty installs whatever the
+# repo currently holds for the minor above. Pin this before a demo so a repo
+# refresh cannot change what you staged.
+node_prep_k8s_package_version: ""
+
+# Pause image kubelet uses for sandboxes. Must match what `kubeadm config images
+# list` reports for your version, or kubelet and kubeadm disagree and pods stay
+# stuck at creation. 3.10 is correct for 1.31+.
+node_prep_sandbox_image: "registry.k8s.io/pause:3.10"
+
+# --- containerd -------------------------------------------------------------
+node_prep_containerd_package: containerd.io
+node_prep_containerd_version: ""          # e.g. "1.7.27-1"; empty = repo latest
+node_prep_docker_repo_url: "https://download.docker.com/linux/ubuntu"
+
+# --- staging ----------------------------------------------------------------
+# Where .deb packages are downloaded to. Deliberately NOT installed -- see the
+# role's README. Kick the install off yourself with the command written to
+# node_prep_notes_path.
+node_prep_staging_dir: /opt/kubeadm-staging
+node_prep_notes_path: /opt/kubeadm-staging/INSTALL-NOTES.md
+
+# Packages staged for manual installation.
+node_prep_staged_packages:
+  - kubelet
+  - kubeadm
+  - kubectl
+
+# --- toggles ----------------------------------------------------------------
+node_prep_disable_swap: true
+node_prep_configure_kernel: true
+node_prep_install_containerd: true
+node_prep_stage_packages: true
+
+# Extra packages every node gets. nfs-common is here because its absence has
+# bitten this homelab before -- pods with NFS PVCs fail to mount with a message
+# that does not mention the missing client.
+node_prep_extra_packages:
+  - nfs-common
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg

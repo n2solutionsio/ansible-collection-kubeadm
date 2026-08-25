@@ -1,0 +1,40 @@
+---
+# overlay backs containerd's snapshotter; br_netfilter is what makes bridged
+# traffic traverse iptables, which kube-proxy and most CNIs depend on.
+
+- name: Load kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/99-kubernetes.conf
+    content: |
+      # Managed by n2solutions.kubeadm.node_prep
+      overlay
+      br_netfilter
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Apply required sysctls
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+    sysctl_set: true
+    reload: true
+    state: present
+  loop:
+    - key: net.bridge.bridge-nf-call-iptables
+      value: "1"
+    - key: net.bridge.bridge-nf-call-ip6tables
+      value: "1"
+    - key: net.ipv4.ip_forward
+      value: "1"
+  loop_control:
+    label: "{{ item.key }}"

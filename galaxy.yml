@@ -1,0 +1,30 @@
+---
+namespace: n2solutions
+name: kubeadm
+version: 0.1.0
+readme: README.md
+authors:
+  - Nick Narcise <nick@n2solutions.io>
+description: Prepare Linux hosts to become kubeadm Kubernetes nodes
+license_file: LICENSE
+tags:
+  - infrastructure
+  - linux
+  - kubernetes
+  - kubeadm
+  - containerd
+  - ubuntu
+dependencies:
+  "ansible.posix": ">=1.5.0"
+  "community.general": ">=8.0.0"
+repository: https://github.com/n2solutionsio/ansible-collection-kubeadm
+documentation: https://github.com/n2solutionsio/ansible-collection-kubeadm
+homepage: https://github.com/n2solutionsio/ansible-collection-kubeadm
+issues: https://github.com/n2solutionsio/ansible-collection-kubeadm/issues
+build_ignore:
+  - "*.tar.gz"
+  - .github
+  - .gitignore
+  - molecule
+  - "roles/*/molecule"
+  - .ansible

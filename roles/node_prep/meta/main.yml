@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: node_prep
+  namespace: n2solutions
+  author: Nick Narcise
+  description: Prepare a Linux host to become a kubeadm Kubernetes node
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+  galaxy_tags:
+    - kubernetes
+    - kubeadm
+    - containerd
+dependencies: []

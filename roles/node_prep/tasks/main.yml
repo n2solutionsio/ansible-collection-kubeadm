@@ -1,0 +1,33 @@
+---
+- name: Assert supported platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'Debian'
+      - ansible_facts['architecture'] == 'x86_64'
+    fail_msg: >-
+      node_prep supports Debian-family x86_64 only; found
+      {{ ansible_facts['os_family'] }}/{{ ansible_facts['architecture'] }}.
+    quiet: true
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ node_prep_extra_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Disable swap
+  when: node_prep_disable_swap | bool
+  ansible.builtin.include_tasks: swap.yml
+
+- name: Configure kernel modules and sysctls
+  when: node_prep_configure_kernel | bool
+  ansible.builtin.include_tasks: kernel.yml
+
+- name: Install and configure containerd
+  when: node_prep_install_containerd | bool
+  ansible.builtin.include_tasks: containerd.yml
+
+- name: Stage Kubernetes packages without installing them
+  when: node_prep_stage_packages | bool
+  ansible.builtin.include_tasks: stage.yml

@@ -1,0 +1,39 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Staging directory exists
+      ansible.builtin.stat:
+        path: /opt/kubeadm-staging
+      register: node_prep_verify_staging
+      failed_when: not node_prep_verify_staging.stat.isdir
+
+    - name: Packages were staged
+      ansible.builtin.find:
+        paths: /opt/kubeadm-staging
+        patterns: "*.deb"
+      register: node_prep_verify_staged
+      failed_when: node_prep_verify_staged.files | length < 3
+
+    # The point of the role: downloaded, not installed. If these ever start
+    # reporting "install ok installed", the staging step has regressed into
+    # doing the thing it exists to avoid.
+    - name: Kubeadm is downloaded but NOT installed
+      ansible.builtin.command: dpkg-query -W -f='${Status}' kubeadm
+      register: node_prep_verify_kubeadm
+      changed_when: false
+      failed_when: "'install ok installed' in node_prep_verify_kubeadm.stdout"
+
+    - name: Kubelet is downloaded but NOT installed
+      ansible.builtin.command: dpkg-query -W -f='${Status}' kubelet
+      register: node_prep_verify_kubelet
+      changed_when: false
+      failed_when: "'install ok installed' in node_prep_verify_kubelet.stdout"
+
+    - name: Install notes were written
+      ansible.builtin.stat:
+        path: /opt/kubeadm-staging/INSTALL-NOTES.md
+      register: node_prep_verify_notes
+      failed_when: not node_prep_verify_notes.stat.exists
